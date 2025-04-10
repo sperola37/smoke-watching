@@ -27,13 +27,13 @@ export default function MapScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync(); //위치 정보 권한 요청
         if (status !== 'granted') {
           setError('Location permission not granted');
           return;
         }
 
-        const currentLocation = await Location.getCurrentPositionAsync({
+        const currentLocation = await Location.getCurrentPositionAsync({ //위치 정보 가져오기
           accuracy: Location.Accuracy.High,
         }).catch(() => null);
 
@@ -44,7 +44,7 @@ export default function MapScreen() {
 
         setLocation(currentLocation);
 
-        // Add example watch point at current location
+        // 예시 데이터 생성
         const examplePoint: WatchPoint = {
           id: '1',
           latitude: currentLocation.coords.latitude,
@@ -66,7 +66,7 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Function to update point status and history with error handling
+  // 감시 지점 상태 업데이트 함수
   const updatePointStatus = async (pointId: string, newStatus: 'green' | 'yellow' | 'red') => {
     try {
       setWatchPoints(currentPoints => 
@@ -91,7 +91,7 @@ export default function MapScreen() {
       console.error('Status update error:', err);
     }
   };
-
+  //에러 시 재시도 버튼 생성
   if (error) {
     return (
       <View style={styles.container}>
@@ -101,7 +101,6 @@ export default function MapScreen() {
             style={styles.retryButton}
             onPress={() => {
               setError(null);
-              // Re-trigger the useEffect by changing its dependency
               setLocation(null);
             }}>
             <Text style={styles.retryButtonText}>Retry</Text>
@@ -118,7 +117,7 @@ export default function MapScreen() {
       </View>
     );
   }
-
+  // 현재 위치를 기준으로 지도를 초기화
   return (
     <View style={styles.container}>
       <MapView
@@ -142,7 +141,7 @@ export default function MapScreen() {
           />
         ))}
       </MapView>
-
+      
       <Modal
         visible={!!selectedPoint}
         animationType="slide"
@@ -150,19 +149,19 @@ export default function MapScreen() {
         onRequestClose={() => setSelectedPoint(null)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Watch Point #{selectedPoint?.id}</Text>
-            <Text style={styles.modalText}>Address: {selectedPoint?.address}</Text>
+            <Text style={styles.modalTitle}>감시 지점 #{selectedPoint?.id}</Text>
+            <Text style={styles.modalText}>주소: {selectedPoint?.address}</Text>
             <Text style={styles.modalText}>
-              Status: <Text style={{ color: selectedPoint?.status }}>{selectedPoint?.status}</Text>
+              상태: <Text style={{ color: selectedPoint?.status }}>{selectedPoint?.status}</Text>
             </Text>
             <Text style={styles.modalText}>
-              Updated: {new Date(selectedPoint?.updatedAt || '').toLocaleString()}
+              갱신 시간: {new Date(selectedPoint?.updatedAt || '').toLocaleString()}
             </Text>
             {selectedPoint?.statusHistory && (
               <View style={styles.historyContainer}>
-                <Text style={styles.historyTitle}>Alert History:</Text>
-                <Text style={styles.historyText}>Yellow Alerts: {selectedPoint.statusHistory.yellow}</Text>
-                <Text style={styles.historyText}>Red Alerts: {selectedPoint.statusHistory.red}</Text>
+                <Text style={styles.historyTitle}>최근 감지 횟수:</Text>
+                <Text style={styles.historyText}>일시적 감지: {selectedPoint.statusHistory.yellow}</Text>
+                <Text style={styles.historyText}>지속적 감지: {selectedPoint.statusHistory.red}</Text>
               </View>
             )}
             {selectedPoint?.photo && (

@@ -1,17 +1,35 @@
 import { StyleSheet, View, Text, Dimensions, ScrollView } from 'react-native';
-import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis, VictoryGroup, VictoryLegend } from 'victory-native';
+import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis, VictoryGroup, VictoryLine, VictoryScatter } from 'victory-native';
 
-// Sample data structure for point status history
+// 예시 데이터
 const pointStatusData = {
-  'Point #1': {
+  '감시점 #1': {
     yellow: 4,
     red: 2,
   },
-  'Point #2': {
+  '감시점 #2': {
     yellow: 3,
     red: 1,
   },
+  '감시점 #3': {
+    yellow: 3,
+    red: 4,
+  },
 };
+
+const timeSeriesYellow = [
+  { time: 1, point: '감시점 #1' },
+  { time: 10, point: '감시점 #1' },
+  { time: 18, point: '감시점 #2' },
+  { time: 14, point: '감시점 #3' },
+];
+
+const timeSeriesRed = [
+  { time: 3, point: '감시점 #1' },
+  { time: 6, point: '감시점 #2' },
+  { time: 13, point: '감시점 #2' },
+  { time: 7, point: '감시점 #3' },
+];
 
 export default function StatisticsScreen() {
   const chartData = Object.entries(pointStatusData).map(([point, counts]) => [
@@ -22,32 +40,20 @@ export default function StatisticsScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Smoking Incident Statistics</Text>
-        <Text style={styles.subtitle}>Status Counts by Watch Point</Text>
+        <Text style={styles.title}>통계 자료</Text>
       </View>
 
       <VictoryChart
         theme={VictoryTheme.material}
         width={Dimensions.get('window').width - 40}
         height={300}
-        domainPadding={{ x: 50 }}>
-        <VictoryLegend
-          x={Dimensions.get('window').width - 160}
-          y={50}
-          title="Status"
-          centerTitle
-          orientation="vertical"
-          gutter={20}
-          style={{ border: { stroke: "black" }, title: { fontSize: 14 } }}
-          data={[
-            { name: "Yellow Alert", symbol: { fill: "#FFA500" } },
-            { name: "Red Alert", symbol: { fill: "#FF0000" } }
-          ]}
-        />
+        domainPadding={{ x: 50 }}
+        padding={{ top: 20, bottom: 50, left: 70, right: 20 }}>
+   
         <VictoryAxis
           tickFormat={(t) => t}
           style={{
-            tickLabels: { fontSize: 12, padding: 5, angle: -45 }
+            tickLabels: { fontSize: 12, padding: 5, angle: 0 }
           }}
         />
         <VictoryAxis
@@ -57,7 +63,7 @@ export default function StatisticsScreen() {
             tickLabels: { fontSize: 12, padding: 5 }
           }}
         />
-        <VictoryGroup offset={20}>
+        <VictoryGroup offset={25}>
           <VictoryBar
             data={chartData.filter(d => d.status === 'yellow')}
             x="point"
@@ -81,24 +87,60 @@ export default function StatisticsScreen() {
         </VictoryGroup>
       </VictoryChart>
 
-      <View style={styles.summaryContainer}>
-        <Text style={styles.summaryTitle}>Detailed Summary</Text>
-        {Object.entries(pointStatusData).map(([point, counts]) => (
-          <View key={point} style={styles.pointSummary}>
-            <Text style={styles.pointTitle}>{point}</Text>
-            <View style={styles.statusCounts}>
-              <View style={styles.statusCount}>
-                <View style={[styles.statusIndicator, { backgroundColor: '#FFA500' }]} />
-                <Text style={styles.countText}>Yellow Alerts: {counts.yellow}</Text>
-              </View>
-              <View style={styles.statusCount}>
-                <View style={[styles.statusIndicator, { backgroundColor: '#FF0000' }]} />
-                <Text style={styles.countText}>Red Alerts: {counts.red}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
+      <VictoryChart
+        theme={VictoryTheme.material}
+        width={Dimensions.get('window').width - 40}
+        height={300}
+        domain={{ x: [0, 24] }}
+        domainPadding={{ y: 50 }}
+        padding={{ top: 20, bottom: 50, left: 70, right: 20 }}
+      >
+        <VictoryAxis
+          label="시간 (시)"
+          tickValues={[0, 4, 8, 12, 16, 20, 24]}
+          style={{
+            axisLabel: { padding: 30, fontSize: 12 },
+            tickLabels: { fontSize: 10 },
+          }}
+        />
+        <VictoryAxis
+          dependentAxis
+          tickFormat={(t) => t}
+          style={{
+            tickLabels: { fontSize: 12, padding: 0 },
+          }}
+        />
+
+        {/* Yellow Alert: Line + Points */}
+        <VictoryLine
+          data={timeSeriesYellow}
+          x="time"
+          y="point"
+          style={{ data: { stroke: '#FFA500', strokeWidth: 2 } }}
+        />
+        <VictoryScatter
+          data={timeSeriesYellow}
+          x="time"
+          y="point"
+          size={5}
+          style={{ data: { fill: '#FFA500' } }}
+        />
+
+        {/* Red Alert: Line + Points */}
+        <VictoryLine
+          data={timeSeriesRed}
+          x="time"
+          y="point"
+          style={{ data: { stroke: '#FF0000', strokeWidth: 2 } }}
+        />
+        <VictoryScatter
+          data={timeSeriesRed}
+          x="time"
+          y="point"
+          size={5}
+          style={{ data: { fill: '#FF0000' } }}
+        />
+      </VictoryChart>
     </ScrollView>
   );
 }
@@ -109,6 +151,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
+    paddingTop: 40,
     padding: 20,
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
@@ -119,10 +162,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
     marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6c757d',
   },
   summaryContainer: {
     padding: 20,
