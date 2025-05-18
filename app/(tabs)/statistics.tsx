@@ -1,144 +1,138 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Dimensions, ScrollView } from 'react-native';
-import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis, VictoryGroup, VictoryLine, VictoryScatter } from 'victory-native';
-
-// 예시 데이터
-const pointStatusData = {
-  '감시점 #1': {
-    yellow: 4,
-    red: 2,
-  },
-  '감시점 #2': {
-    yellow: 3,
-    red: 1,
-  },
-  '감시점 #3': {
-    yellow: 3,
-    red: 4,
-  },
-};
-
-const timeSeriesYellow = [
-  { time: 1, point: '감시점 #1' },
-  { time: 10, point: '감시점 #1' },
-  { time: 18, point: '감시점 #2' },
-  { time: 14, point: '감시점 #3' },
-];
-
-const timeSeriesRed = [
-  { time: 3, point: '감시점 #1' },
-  { time: 6, point: '감시점 #2' },
-  { time: 13, point: '감시점 #2' },
-  { time: 7, point: '감시점 #3' },
-];
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  VictoryBar,
+  VictoryChart,
+  VictoryTheme,
+  VictoryAxis,
+  VictoryGroup,
+  VictoryScatter,
+  VictoryLabel,
+} from 'victory-native';
 
 export default function StatisticsScreen() {
-  const chartData = Object.entries(pointStatusData).map(([point, counts]) => [
-    { point, status: 'yellow', count: counts.yellow },
-    { point, status: 'red', count: counts.red },
-  ]).flat();
+  const [chartData, setChartData] = useState<{ point: string; count: number }[]>([]);
+  const [timeSeriesRed, setTimeSeriesRed] = useState<{ time: number; point: string }[]>([]);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      const keys = await AsyncStorage.getAllKeys();
+      const watchKeys = keys.filter((k) => k.startsWith('history:'));
+      const allEntries = await AsyncStorage.multiGet(watchKeys);
+
+      const pointCount: { [point: string]: number } = {};
+      const timeData: { time: number; point: string }[] = [];
+
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      for (const [key, value] of allEntries) {
+        const address = key.replace('history:', '');
+        const entries = value ? JSON.parse(value) : [];
+
+        const recentEntries = entries.filter((entry: { timestamp: string }) => {
+          const ts = new Date(entry.timestamp);
+          return ts >= oneWeekAgo;
+        });
+
+        pointCount[address] = recentEntries.length;
+
+        recentEntries.forEach((entry: { timestamp: string }) => {
+          const hour = new Date(entry.timestamp).getHours();
+          timeData.push({ time: hour, point: address });
+        });
+      }
+
+      setChartData(Object.entries(pointCount).map(([point, count]) => ({ point, count })));
+      setTimeSeriesRed(timeData);
+    };
+
+
+    loadHistory();
+  }, []);
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+            <View style={styles.header}>
         <Text style={styles.title}>통계 자료</Text>
       </View>
 
+      <Text style={styles.graphTitle}>지난 주 장소 별 흡연 횟수</Text>
+
+      {/* 막대 그래프 */}
       <VictoryChart
         theme={VictoryTheme.material}
         width={Dimensions.get('window').width - 40}
         height={300}
         domainPadding={{ x: 50 }}
-        padding={{ top: 20, bottom: 50, left: 70, right: 20 }}>
-   
+        padding={{ top: 20, bottom: 50, left: 70, right: 20 }}
+        categories={{ x: chartData.map((item) => item.point) }}>
+          
         <VictoryAxis
-          tickFormat={(t) => t}
+          label="장소 (address)"
+          axisLabelComponent={<VictoryLabel dy={25} style={{ fontSize: 12 }} />}
+          tickFormat={(t) => String(t)}
           style={{
-            tickLabels: { fontSize: 12, padding: 5, angle: 0 }
+            tickLabels: { fontSize: 10, textAnchor: 'end', padding: 10 },
           }}
         />
         <VictoryAxis
           dependentAxis
           tickFormat={(x) => Math.round(x)}
           style={{
-            tickLabels: { fontSize: 12, padding: 5 }
+            tickLabels: { fontSize: 12, padding: 5 },
           }}
         />
         <VictoryGroup offset={25}>
           <VictoryBar
-            data={chartData.filter(d => d.status === 'yellow')}
+            data={chartData}
             x="point"
             y="count"
             style={{
               data: {
-                fill: "#FFA500",
-              }
-            }}
-          />
-          <VictoryBar
-            data={chartData.filter(d => d.status === 'red')}
-            x="point"
-            y="count"
-            style={{
-              data: {
-                fill: "#FF0000",
-              }
+                fill: '#FF0000',
+              },
             }}
           />
         </VictoryGroup>
       </VictoryChart>
 
+      <Text style={styles.graphTitle}>지난 주 시간대 별 흡연 횟수</Text>
+      {/* 감지 시간 산점도 */}
       <VictoryChart
         theme={VictoryTheme.material}
         width={Dimensions.get('window').width - 40}
-        height={300}
+        height={280}
         domain={{ x: [0, 24] }}
         domainPadding={{ y: 50 }}
-        padding={{ top: 20, bottom: 50, left: 70, right: 20 }}
+        padding={{ top: 0, bottom: 40, left: 70, right: 20 }}
       >
         <VictoryAxis
           label="시간 (시)"
           tickValues={[0, 4, 8, 12, 16, 20, 24]}
           style={{
-            axisLabel: { padding: 30, fontSize: 12 },
+            axisLabel: { padding: 25, fontSize: 12 },
             tickLabels: { fontSize: 10 },
           }}
         />
         <VictoryAxis
           dependentAxis
-          tickFormat={(t) => t}
+          tickValues={chartData.map((item) => item.point)}
           style={{
-            tickLabels: { fontSize: 12, padding: 0 },
+            tickLabels: { fontSize: 12, padding: 5 },
           }}
         />
-
-        {/* Yellow Alert: Line + Points */}
-        <VictoryLine
-          data={timeSeriesYellow}
-          x="time"
-          y="point"
-          style={{ data: { stroke: '#FFA500', strokeWidth: 2 } }}
-        />
-        <VictoryScatter
-          data={timeSeriesYellow}
-          x="time"
-          y="point"
-          size={5}
-          style={{ data: { fill: '#FFA500' } }}
-        />
-
-        {/* Red Alert: Line + Points */}
-        <VictoryLine
-          data={timeSeriesRed}
-          x="time"
-          y="point"
-          style={{ data: { stroke: '#FF0000', strokeWidth: 2 } }}
-        />
         <VictoryScatter
           data={timeSeriesRed}
           x="time"
           y="point"
-          size={5}
-          style={{ data: { fill: '#FF0000' } }}
+          size={6}
+          style={{
+            data: {
+              fill: '#FF0000',
+            },
+          }}
         />
       </VictoryChart>
     </ScrollView>
@@ -163,45 +157,12 @@ const styles = StyleSheet.create({
     color: '#212529',
     marginBottom: 4,
   },
-  summaryContainer: {
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  summaryTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#212529',
-  },
-  pointSummary: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  pointTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#343a40',
-  },
-  statusCounts: {
-    gap: 8,
-  },
-  statusCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  countText: {
+  graphTitle: {
     fontSize: 16,
-    color: '#495057',
+    fontWeight: 'bold',
+    marginLeft: 20,
+    marginTop: 20,
+    marginBottom: 5,
+    color: '#343a40',
   },
 });
