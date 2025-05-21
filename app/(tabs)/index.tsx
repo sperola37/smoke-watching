@@ -41,6 +41,7 @@ export default function MapScreen() {
           longitude: coord.longitude,
           accuracy: 5,
           altitude: 0,
+          altitudeAccuracy: 5,
           heading: 0,
           speed: 0,
         },
