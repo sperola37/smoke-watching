@@ -1,6 +1,5 @@
-// MapScreen.tsx
 import { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Text, Image, Modal, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, Image, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -25,122 +24,6 @@ export default function MapScreen() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const mapRef = useRef<MapView>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Location permission not granted');
-        return;
-      }
-
-      const initialLoc = await Location.geocodeAsync('한성대학교');
-      const coord = initialLoc[0];
-      setLocation({
-        coords: {
-          latitude: coord.latitude,
-          longitude: coord.longitude,
-          accuracy: 5,
-          altitude: 0,
-          altitudeAccuracy: 5,
-          heading: 0,
-          speed: 0,
-        },
-        timestamp: Date.now(),
-      });
-
-      setWatchPoints([
-        {
-          id: 'example',
-          latitude: coord.latitude,
-          longitude: coord.longitude,
-          address: '한성대학교',
-          status: 'green',
-          updatedAt: new Date().toISOString(),
-          photo: 'https://raw.githubusercontent.com/sperola37/test-repo-1743934500179/refs/heads/main/photo1.png',
-          history: [],
-        },
-      ]);
-    })();
-  }, []);
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
-      const data = notification.request.content.data;
-      if (!data?.address || !data?.status) return;
-
-      const coords = await Location.geocodeAsync(data.address);
-      if (!coords.length) return;
-      const { latitude, longitude } = coords[0];
-
-      setWatchPoints((prev) => {
-        const existing = prev.find((p) => p.address === data.address);
-        const newTimestamp = new Date().toISOString();
-
-        if (existing) {
-          const updated: WatchPoint = {
-            ...existing,
-            status: data.status === 'smoking' ? 'red' : 'green',
-            updatedAt: newTimestamp,
-            photo: data.photo,
-            history: data.status === 'smoking' ? [...(existing.history || []), { photo: data.photo, timestamp: newTimestamp }] : existing.history,
-          };
-          storeHistory(updated.address, updated.history || []);
-          return prev.map((p) => (p.address === data.address ? updated : p));
-        } else {
-          const newPoint: WatchPoint = {
-            id: Date.now().toString(),
-            latitude,
-            longitude,
-            address: data.address,
-            status: data.status === 'smoking' ? 'red' : 'green',
-            updatedAt: newTimestamp,
-            photo: data.photo,
-            history: data.status === 'smoking' ? [{ photo: data.photo, timestamp: newTimestamp }] : [],
-          };
-          storeHistory(newPoint.address, newPoint.history || []);
-          return [...prev, newPoint];
-        }
-      });
-    });
-
-    const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
-  const data = response.notification.request?.content?.data;
-
-  if (!data) {
-    console.error('❌ 알림 클릭: data 없음!', response.notification.request.content);
-    return;
-  }
-
-  console.log('✅ 알림 클릭됨, 수신된 data:', data);
-
-  try {
-    const coords = await Location.geocodeAsync(data.address);
-    if (!coords.length) return;
-
-    const { latitude, longitude } = coords[0];
-    mapRef.current?.animateToRegion({
-      latitude,
-      longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
-
-    const matched = watchPoints.find((p) => p.address === data.address);
-    if (matched) {
-      openPoint(matched);
-    }
-  } catch (err) {
-    console.warn('탭한 알림 처리 실패:', err);
-  }
-});
-
-
-    return () => {
-      subscription.remove();
-      responseListener.remove();
-    };
-  }, [watchPoints]);
-
   const storeHistory = async (address: string, history: { photo: string; timestamp: string }[]) => {
     await AsyncStorage.setItem(`history:${address}`, JSON.stringify(history));
   };
@@ -154,6 +37,111 @@ export default function MapScreen() {
     const history = await getHistory(point.address);
     setSelectedPoint({ ...point, history });
   };
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Location permission not granted');
+        return;
+      }
+
+      const locations = ['한성대학교', '한성대역', '한성대 공학관', '혜화역', '대학로'];
+      const geocodedCoords = await Promise.all(locations.map((loc) => Location.geocodeAsync(loc)));
+      const photoUrl = 'https://raw.githubusercontent.com/sperola37/test-repo-1743934500179/refs/heads/main/photo1.png';
+
+      const generateRandomHistory = (): { photo: string; timestamp: string }[] => {
+        const count = Math.floor(Math.random() * 5) + 1;
+        const now = Date.now();
+        return Array.from({ length: count }, () => {
+          const offset = Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000);
+          return { photo: photoUrl, timestamp: new Date(now - offset).toISOString() };
+        });
+      };
+
+      const examplePoints: WatchPoint[] = geocodedCoords.map((coords, idx) => {
+        const history = generateRandomHistory();
+        const address = locations[idx];
+        storeHistory(address, history);
+        return {
+          id: `${idx}`,
+          latitude: coords[0].latitude,
+          longitude: coords[0].longitude,
+          address,
+          status: 'green',
+          updatedAt: new Date().toISOString(),
+          photo: photoUrl,
+          history,
+        };
+      });
+
+      setLocation({
+        coords: {
+          latitude: geocodedCoords[0][0].latitude,
+          longitude: geocodedCoords[0][0].longitude,
+          accuracy: 5,
+          altitude: 0,
+          altitudeAccuracy: 5,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      setWatchPoints(examplePoints);
+    })();
+  }, []);
+
+  // ✅ 알림 수신 리스너 등록
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
+      const data = notification.request.content.data;
+      if (!data?.address || !data?.status) return;
+
+      const coords = await Location.geocodeAsync(data.address);
+      if (!coords.length) return;
+      const { latitude, longitude } = coords[0];
+      const newTimestamp = new Date().toISOString();
+
+      setWatchPoints((prev) => {
+        const existing = prev.find((p) => p.address === data.address);
+        if (existing) {
+          const updated: WatchPoint = {
+            ...existing,
+            status: data.status === 'smoking' ? 'red' : 'green',
+            updatedAt: newTimestamp,
+            photo: data.photo,
+            history: data.status === 'smoking'
+              ? [...(existing.history || []), { photo: data.photo, timestamp: newTimestamp }]
+              : existing.history,
+          };
+          if (data.status === 'smoking') {
+            storeHistory(updated.address, updated.history || []);
+          }
+          return prev.map((p) => (p.address === data.address ? updated : p));
+        } else {
+          const newPoint: WatchPoint = {
+            id: Date.now().toString(),
+            latitude,
+            longitude,
+            address: data.address,
+            status: data.status === 'smoking' ? 'red' : 'green',
+            updatedAt: newTimestamp,
+            photo: data.photo,
+            history: data.status === 'smoking'
+              ? [{ photo: data.photo, timestamp: newTimestamp }]
+              : [],
+          };
+          if (data.status === 'smoking') {
+            storeHistory(newPoint.address, newPoint.history || []);
+          }
+          return [...prev, newPoint];
+        }
+      });
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   if (error) {
     return (
@@ -182,7 +170,8 @@ export default function MapScreen() {
           longitude: location.coords.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
-        }}>
+        }}
+      >
         {watchPoints.map((point) => (
           <Marker
             key={point.id}
@@ -193,15 +182,17 @@ export default function MapScreen() {
         ))}
       </MapView>
 
+      {/* 상세 모달 */}
       <Modal visible={!!selectedPoint} transparent animationType="slide" onRequestClose={() => setSelectedPoint(null)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{selectedPoint?.address}</Text>
             <Text>
-  상태: <Text style={{ color: selectedPoint?.status === 'green' ? 'green' : 'red' }}>
-    {selectedPoint?.status === 'green' ? '흡연 감지 안됨' : '흡연 감지됨'}
-  </Text>
-</Text>
+              상태:{' '}
+              <Text style={{ color: selectedPoint?.status === 'green' ? 'green' : 'red' }}>
+                {selectedPoint?.status === 'green' ? '흡연 감지 안됨' : '흡연 감지됨'}
+              </Text>
+            </Text>
             <Text>갱신 시각: {new Date(selectedPoint?.updatedAt || '').toLocaleString()}</Text>
             {selectedPoint?.photo && (
               <TouchableOpacity onPress={() => setShowHistoryModal(true)}>
@@ -215,6 +206,7 @@ export default function MapScreen() {
         </View>
       </Modal>
 
+      {/* 히스토리 모달 */}
       <Modal visible={showHistoryModal} transparent animationType="slide" onRequestClose={() => setShowHistoryModal(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -223,7 +215,16 @@ export default function MapScreen() {
               {selectedPoint?.history?.map((item, index) => (
                 <View key={index} style={{ marginRight: 10 }}>
                   <Image source={{ uri: item.photo }} style={{ width: 100, height: 100, borderRadius: 8 }} />
-                  <Text style={{ fontSize: 12 }}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
+                  <Text style={{ fontSize: 12 }}>
+                    {new Date(item.timestamp).toLocaleString('ko-KR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    })}
+                  </Text>
                 </View>
               ))}
             </ScrollView>

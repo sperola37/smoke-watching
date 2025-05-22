@@ -30,6 +30,9 @@
         "projectId": "4df2e8b7-1e79-401e-98a2-1d65e701a32e"
       }
     },
-    "owner": "sperola37"
+    "owner": "sperola37",
+    "android": {
+      "package": "com.sperola37.boltexponativewind"
+    }
   }
 }
