@@ -15,19 +15,19 @@ import {
 const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function StatisticsScreen() {
-  const [chartData, setChartData] = useState([]);
-  const [timeSeriesRed, setTimeSeriesRed] = useState([]);
-  const [chartDataWeekday, setChartDataWeekday] = useState([]);
-  const [pointIndexMap, setPointIndexMap] = useState({});
+  const [chartData, setChartData] = useState<{ point: string; count: number }[]>([]);
+  const [timeSeriesRed, setTimeSeriesRed] = useState<{ time: string; yValue: number }[]>([]);
+  const [chartDataWeekday, setChartDataWeekday] = useState<{ weekday: string; count: number }[]>([]);
+  const [pointIndexMap, setPointIndexMap] = useState<Record<string, number>>({});
 
   const loadHistory = async () => {
     const keys = await AsyncStorage.getAllKeys();
     const watchKeys = keys.filter((k) => k.startsWith('history:'));
     const allEntries = await AsyncStorage.multiGet(watchKeys);
 
-    const pointCount = {};
-    const rawTimeData = [];
-    const dayCount = new Array(7).fill(0);
+    const pointCount: Record<string, number> = {};
+    const rawTimeData: { time: string; point: string }[] = [];
+    const dayCount: number[] = new Array(7).fill(0);
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -36,14 +36,14 @@ export default function StatisticsScreen() {
       const address = key.replace('history:', '');
       const entries = value ? JSON.parse(value) : [];
 
-      const recentEntries = entries.filter((entry) => {
+      const recentEntries = entries.filter((entry: { timestamp: string }) => {
         const ts = new Date(entry.timestamp);
         return ts >= oneWeekAgo;
       });
 
       pointCount[address] = recentEntries.length;
 
-      recentEntries.forEach((entry) => {
+      recentEntries.forEach((entry: { timestamp: string }) => {
         const date = new Date(entry.timestamp);
         const hour = date.getHours();
         const weekday = date.getDay();
@@ -53,7 +53,7 @@ export default function StatisticsScreen() {
     }
 
     const pointList = Object.keys(pointCount);
-    const pointMap = {};
+    const pointMap: Record<string, number> = {};
     pointList.forEach((point, idx) => {
       pointMap[point] = idx + 1;
     });
