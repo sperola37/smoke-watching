@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, Dimensions, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, Dimensions, ScrollView, Modal, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -11,6 +11,7 @@ import {
   VictoryScatter,
   VictoryLabel,
 } from 'victory-native';
+import * as Notifications from 'expo-notifications';
 
 const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -19,6 +20,8 @@ export default function StatisticsScreen() {
   const [timeSeriesRed, setTimeSeriesRed] = useState<{ time: string; yValue: number }[]>([]);
   const [chartDataWeekday, setChartDataWeekday] = useState<{ weekday: string; count: number }[]>([]);
   const [pointIndexMap, setPointIndexMap] = useState<Record<string, number>>({});
+  const [tokenModalVisible, setTokenModalVisible] = useState(false);
+  const [expoToken, setExpoToken] = useState('');
 
   const loadHistory = async () => {
     const keys = await AsyncStorage.getAllKeys();
@@ -80,10 +83,36 @@ export default function StatisticsScreen() {
     }, [])
   );
 
+  const sendTokenToEC2 = async () => {
+    try {
+      const token = await Notifications.getExpoPushTokenAsync();
+      setExpoToken(token.data);
+
+      const response = await fetch('http://43.200.193.228:5000/register-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token.data })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        Alert.alert('성공', 'Expo 푸시 토큰이 EC2로 전송되었습니다.');
+      } else {
+        Alert.alert('실패', result.message || '토큰 전송 실패');
+      }
+    } catch (error) {
+      console.error('토큰 전송 오류:', error);
+      Alert.alert('에러', '토큰 전송 중 오류 발생');
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>통계 자료</Text>
+        <TouchableOpacity style={styles.tokenButton} onPress={sendTokenToEC2}>
+          <Text style={styles.tokenButtonText}>토큰 전송</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.graphTitle}>지난 주 장소 별 흡연 횟수</Text>
@@ -193,12 +222,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#212529',
-    marginBottom: 4,
+  },
+  tokenButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  tokenButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   graphTitle: {
     fontSize: 16,
@@ -207,5 +249,38 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 5,
     color: '#343a40',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { registerForPushNotificationsAsync, setupNotificationListener, handleNotificationData } from './notification-handler';
+import { registerForPushNotificationsAsync, setupNotificationListener, handleNotificationData } from './utils/notification-handler';
 import { Alert } from 'react-native';
 
 export default function RootLayout() {

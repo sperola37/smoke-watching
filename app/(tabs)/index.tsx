@@ -22,6 +22,7 @@ export default function MapScreen() {
   const [watchPoints, setWatchPoints] = useState<WatchPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [mapRefreshKey, setMapRefreshKey] = useState(0);
   const mapRef = useRef<MapView>(null);
 
   const storeHistory = async (address: string, history: { photo: string; timestamp: string }[]) => {
@@ -92,7 +93,6 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // ✅ 알림 수신 리스너 등록
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
       const data = notification.request.content.data;
@@ -104,22 +104,29 @@ export default function MapScreen() {
       const newTimestamp = new Date().toISOString();
 
       setWatchPoints((prev) => {
-        const existing = prev.find((p) => p.address === data.address);
-        if (existing) {
-          const updated: WatchPoint = {
-            ...existing,
-            status: data.status === 'smoking' ? 'red' : 'green',
-            updatedAt: newTimestamp,
-            photo: data.photo,
-            history: data.status === 'smoking'
-              ? [...(existing.history || []), { photo: data.photo, timestamp: newTimestamp }]
-              : existing.history,
-          };
-          if (data.status === 'smoking') {
-            storeHistory(updated.address, updated.history || []);
+        const updated = prev.map((p) => {
+          if (p.address === data.address) {
+            const newHistory = data.status === 'smoking'
+              ? [...(p.history || []), { photo: data.photo, timestamp: newTimestamp }]
+              : p.history;
+
+            if (data.status === 'smoking') {
+              storeHistory(p.address, newHistory || []);
+            }
+
+            return {
+              ...p,
+              status: (data.status === 'smoking' ? 'red' : 'green') as 'red' | 'green',
+              updatedAt: newTimestamp,
+              photo: data.photo,
+              history: newHistory,
+            };
           }
-          return prev.map((p) => (p.address === data.address ? updated : p));
-        } else {
+          return p;
+        });
+
+        const exists = prev.some((p) => p.address === data.address);
+        if (!exists) {
           const newPoint: WatchPoint = {
             id: Date.now().toString(),
             latitude,
@@ -135,9 +142,13 @@ export default function MapScreen() {
           if (data.status === 'smoking') {
             storeHistory(newPoint.address, newPoint.history || []);
           }
-          return [...prev, newPoint];
+          return [...updated, newPoint];
         }
+
+        return [...updated];
       });
+
+      setMapRefreshKey((prev) => prev + 1); // 🔄 강제 리렌더링
     });
 
     return () => subscription.remove();
@@ -162,6 +173,7 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <MapView
+        key={mapRefreshKey} // 🔄 키 변경 시 MapView 재생성
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
@@ -174,7 +186,7 @@ export default function MapScreen() {
       >
         {watchPoints.map((point) => (
           <Marker
-            key={point.id}
+            key={point.address}
             coordinate={{ latitude: point.latitude, longitude: point.longitude }}
             pinColor={point.status === 'green' ? '#00cc00' : '#ff0000'}
             onPress={() => openPoint(point)}

@@ -11,25 +11,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ===== EC2로 푸시 토큰 전송 =====
-async function sendTokenToEC2(token: string) {
-  try {
-    const response = await fetch('http://43.200.193.228:5000/register-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-
-    if (!response.ok) {
-      console.error('❌ EC2 토큰 전송 실패:', response.status);
-    } else {
-      console.log('✅ EC2에 토큰 전송 성공');
-    }
-  } catch (error) {
-    console.error('❌ EC2 토큰 전송 중 에러:', error);
-  }
-}
-  
 // ===== 디바이스 푸시 알림 등록 =====
 export async function registerForPushNotificationsAsync() {
   try {
@@ -60,7 +41,6 @@ export async function registerForPushNotificationsAsync() {
 
     if (token?.data) {
       console.log('✅ 푸시 토큰:', token.data);
-      await sendTokenToEC2(token.data);
     }
 
     return token;
@@ -102,17 +82,10 @@ export async function handleNotificationData(data: any) {
   try {
     if (!data) throw new Error('No notification data received');
 
-    const requiredFields = ['id', 'latitude', 'longitude', 'status'];
-    const missingFields = requiredFields.filter(field => !data[field]);
-
-    if (missingFields.length > 0) {
-      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-    }
-
     return {
-      id: data.id,
-      latitude: parseFloat(data.latitude),
-      longitude: parseFloat(data.longitude),
+      id: Date.now().toString(), // fallback id
+      latitude: 0,
+      longitude: 0,
       address: data.address || 'Unknown Location',
       status: data.status,
       photo: data.photo,
